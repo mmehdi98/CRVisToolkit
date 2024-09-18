@@ -1,16 +1,20 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from draw_tdcr import draw_tdcr
-
+import copy
 
 class Section:
     """ """
 
-    def __init__(self, n, l, kappa, phi, base_tf):
+    def __init__(self, n, l, kappa, phi, base_tf, kappa_range=None, phi_range=None):
         self._base_tf = base_tf
         self.n = n
         self.kappa = kappa
         self.l = l
         self.phi = phi
+        self.kappa_range = kappa_range
+        self.phi_range = phi_range
 
     @property
     def g(self):
@@ -90,11 +94,11 @@ class TDCR_PCC:
         for i, section in enumerate(self.sections):
             if i == 0:
                 section_details.append(
-                    f"Section {i}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n}"
+                    f"Section {i+1}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n}"
                 )
             else:
                 section_details.append(
-                    f"Section {i}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n-1}"
+                    f"Section {i+1}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n-1}"
                 )
 
         return "\n".join(section_details)
@@ -110,7 +114,7 @@ class TDCR_PCC:
 
     @property
     def end_tf(self):
-        return self._end_tf
+        return self.g[-1].reshape((4, 4), order='F')
 
     def add_section(self, n, l, kappa, phi=0):
         if len(self.sections) == 0:
@@ -122,7 +126,7 @@ class TDCR_PCC:
             new_section = Section(n + 1, l, kappa, phi, base_tf)
             self._sections.append(new_section)
 
-        self._end_tf = self.sections[-1].end_tf
+        # self._end_tf = self.sections[-1].end_tf
 
     def modify_section(self, index, n=None, l=None, kappa=None, phi=None):
         if n is not None:
@@ -161,8 +165,48 @@ class TDCR_PCC:
         draw_tdcr(self.g, np.array(section_ends), **kwargs)
 
     def get_disk_tf(self, i):
-        self.calculate_g()
         return self.g[i].reshape((4, 4), order='F')
+
+    def workspace(self, ranges=None, kappa_step= 0.5, phi_step= 0.5):
+        if ranges == None:
+            ranges = []
+            for i, section in enumerate(self.sections):
+                if section.kappa_range == None:
+                    raise ValueError(f"Please specify a kappa range for section {i+1}")
+                elif section.phi_range == None:
+                    raise ValueError(f"Please specify a phi range for section {i+1}")
+                else:
+                    ranges.append({"kappa_range": section.kappa_range, "phi_range": section.phi_range})
+        if len(ranges) != len(self.sections):
+            raise ValueError("The number of ranges must match the number of sections")
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        obj = copy.deepcopy(self)
+        kappa_range = [rng["kappa_range"] for rng in ranges]
+        phi_range = [rng["phi_range"] for rng in ranges]
+
+        self._compute_workspace(obj, ax, kappa_range, phi_range, kappa_step, phi_step)
+
+        plt.show()
+
+    @staticmethod
+    def _compute_workspace(robot, ax, kappa_range, phi_range, kappa_step, phi_step):
+        def recursive(k, kappa, phi):
+            i = len(robot.sections)-k-1
+            if k == 0:
+                x, y, z = robot.end_tf[:3, 3]
+                ax.scatter(x,y,z, color="b")
+                return
+            for kp in np.arange(kappa_range[i][0], kappa_range[i][1], kappa_step):
+                if phi_range[i][0] == phi_range[i][1]:
+                    robot.modify_section(i, kappa= kp)
+                    recursive(k-1, kp, 0)
+                else:
+                    for ph in np.arange(phi_range[i][0], phi_range[i][1], phi_step):
+                        robot.modify_section(i, kappa= kp, phi= ph)
+                        recursive(k-1, kp, ph)
+        recursive(len(robot.sections)-1, 0, 0)
 
 
 def main():
@@ -171,7 +215,7 @@ def main():
 
     # Section properties
     diameter = 6.2e-3
-    l1 = 200e-3
+    l1 = 100e-3
     l2 = 50e-3
     l3 = 50e-3
     rho1 = 2 * l1 / np.pi
@@ -195,6 +239,14 @@ def main():
     print(f"\nThe transfer function for the {x}th disk is: \n", robot.get_disk_tf(x))
 
     robot.draw(r_disk=diameter / 2)
+
+    ranges = [
+        {"kappa_range": (0, 5), "phi_range": (0, np.pi*2)},
+        {"kappa_range": (0, 2), "phi_range": (0, 0)},
+        {"kappa_range": (0, 2), "phi_range": (0, 0)},
+    ]
+
+    robot.workspace(ranges=ranges, kappa_step= 0.5, phi_step= 0.8)
 
 
 if __name__ == "__main__":
