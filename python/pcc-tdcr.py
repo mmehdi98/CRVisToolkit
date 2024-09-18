@@ -3,19 +3,34 @@ from draw_tdcr import draw_tdcr
 
 
 class Section:
+    """ """
+
     def __init__(self, n, l, kappa, phi, base_tf):
-        self.base_tf = base_tf
+        self._base_tf = base_tf
         self.n = n
         self.kappa = kappa
         self.l = l
         self.phi = phi
-        self.configuration()
 
     @property
     def g(self):
+        self._configuration()
         return self._g
 
-    def configuration(self):
+    @property
+    def end_tf(self):
+        self._configuration()
+        return self._end_tf
+
+    @property
+    def base_tf(self):
+        return self._base_tf
+
+    @base_tf.setter
+    def base_tf(self, base_tf):
+        self._base_tf = base_tf
+
+    def _configuration(self):
         g = np.zeros((self.n, 16))
         points = np.linspace(0, self.l, self.n)
         for i, s in enumerate(points):
@@ -31,7 +46,7 @@ class Section:
             )
             transformation = self.base_tf @ np.concatenate((rotation, pos), axis=1)
             if i == (self.n - 1):
-                self.end_tf = transformation
+                self._end_tf = transformation
             g[i] = transformation.flatten(order="F")
         self._g = g
 
@@ -64,16 +79,23 @@ class Section:
         )
 
 
-class TDCR:
+class TDCR_PCC:
+    """ """
+
     def __init__(self):
         self._sections = []
 
     def __str__(self):
         section_details = []
         for i, section in enumerate(self.sections):
-            section_details.append(
-                f"Section {i}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n}"
-            )
+            if i == 0:
+                section_details.append(
+                    f"Section {i}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n}"
+                )
+            else:
+                section_details.append(
+                    f"Section {i}: Length = {section.l:.3f}, Curvature = {section.kappa:.3f}, Phi = {section.phi:.3f}, Number of Disks = {section.n-1}"
+                )
 
         return "\n".join(section_details)
 
@@ -102,13 +124,22 @@ class TDCR:
 
         self._end_tf = self.sections[-1].end_tf
 
-    def modify_section(i, n, l, kappa, phi):
-        self._sections[i] = Section(n, l, kappa, phi=0)
+    def modify_section(self, index, n=None, l=None, kappa=None, phi=None):
+        if n is not None:
+            self._sections[index].n = n
+        if l is not None:
+            self._sections[index].l = l
+        if kappa is not None:
+            self._sections[index].kappa = kappa
+        if phi is not None:
+            self._sections[index].phi = phi
+        for i, section in enumerate(self.sections[index + 1 :]):
+            section.base_tf = self.sections[index + i].end_tf
+        self.calculate_g()
 
     def calculate_g(self):
         if len(self.sections) == 0:
             raise ValueError("The robot has no secitons")
-            # self._g = None
         g_sections = []
         for i, section in enumerate(self.sections):
             if i == 0:
@@ -118,7 +149,7 @@ class TDCR:
 
         self._g = np.concatenate(g_sections, axis=0)
 
-    def draw(self):
+    def draw(self, **kwargs):
         if len(self.sections) == 0:
             raise ValueError("The robot has no sections")
         i = self.sections[0].n
@@ -127,25 +158,43 @@ class TDCR:
             i += section.n - 1
             section_ends.append(i)
 
-        print(section_ends)
-        draw_tdcr(self.g, np.array(section_ends))
+        draw_tdcr(self.g, np.array(section_ends), **kwargs)
+
+    def get_disk_tf(self, i):
+        self.calculate_g()
+        return self.g[i].reshape((4, 4), order='F')
 
 
 def main():
-    robot = TDCR()
+    # Instantiating robot object
+    robot = TDCR_PCC()
+
+    # Section properties
+    diameter = 6.2e-3
     l1 = 200e-3
+    l2 = 50e-3
+    l3 = 50e-3
     rho1 = 2 * l1 / np.pi
-    robot.add_section(10, l1, 1 / rho1)
-    robot.add_section(5, 50e-3, 0)
-    robot.add_section(5, 50e-3, 0)
+    kappa1 = 1 / rho1
+    kappa2 = 0
+    kappa3 = 0
 
-    # print(robot.end_tf)
-    print(robot)
-    robot.draw()
+    # Adding sections
+    robot.add_section(20, l1, kappa1)
+    robot.add_section(5, l2, kappa2)
+    robot.add_section(5, l3, kappa3)
 
-    # draw_tdcr(robot.g, robot.draw())
+    # Section modifiction
+    robot.modify_section(0, l=50e-3, kappa=0)
 
-    # print(robot.g)
+    # Results
+    print("Robot specifications: \n", robot, sep="")
+    print("\nThe transfer function for the tip: \n", robot.end_tf)
+
+    x = 5
+    print(f"\nThe transfer function for the {x}th disk is: \n", robot.get_disk_tf(x))
+
+    robot.draw(r_disk=diameter / 2)
 
 
 if __name__ == "__main__":
