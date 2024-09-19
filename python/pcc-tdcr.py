@@ -331,7 +331,7 @@ class TDCR_PCC:
         if ax == None:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection="3d")
-            showplot = True           
+            showplot = True
         obj = copy.deepcopy(self)
         kappa_range = [rng["kappa_range"] for rng in ranges]
         phi_range = [rng["phi_range"] for rng in ranges]
@@ -406,7 +406,15 @@ def main():
     x = 5
     print(f"\nThe transfer function for the {x}th disk is: \n", robot.get_disk_tf(x))
 
-    ax = setupfigure(robot.g, robot.section_ends, tipframe=True, segframe=False, baseframe=False, projections=False, baseplate=True)
+    ax = setupfigure(
+        robot.g,
+        robot.section_ends,
+        tipframe=True,
+        segframe=False,
+        baseframe=False,
+        projections=False,
+        baseplate=True,
+    )
     robot.draw(r_disk=diameter / 2, ax=ax)
 
     ranges = [
