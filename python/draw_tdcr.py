@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from utils import nullspace, setupfigure
 
 
-def draw_tdcr(g: np.ndarray[float], seg_end: np.ndarray[int], r_disk: float=2.5*1e-3, r_height: float=1.5*1e-3, tipframe: bool=True, segframe: bool=False, baseframe: bool=False, projections: bool=False, baseplate: bool=True):
+def draw_tdcr(g: np.ndarray[float], seg_end: np.ndarray[int], r_disk: float=2.5*1e-3, r_height: float=1.5*1e-3, tipframe: bool=True, segframe: bool=False, baseframe: bool=False, projections: bool=False, baseplate: bool=True, ax=None):
     '''
     DRAW_TDCR Creates a figure of a tendon-driven continuum robot (tdcr)
 
@@ -52,7 +52,10 @@ def draw_tdcr(g: np.ndarray[float], seg_end: np.ndarray[int], r_disk: float=2.5*
         raise ValueError("Dimension mismatch")
 
     # Setup figure
-    ax = setupfigure(g=g, seg_end=seg_end, tipframe=tipframe, segframe=segframe, baseframe=baseframe, projections=projections, baseplate=baseplate)
+    showplot = False
+    if ax == None:
+        ax = setupfigure(g=g, seg_end=seg_end, tipframe=tipframe, segframe=segframe, baseframe=baseframe, projections=projections, baseplate=baseplate)
+        showplot = True
 
     numseg = seg_end.size
 
@@ -137,7 +140,8 @@ def draw_tdcr(g: np.ndarray[float], seg_end: np.ndarray[int], r_disk: float=2.5*
 
         ax.plot_surface(x, y, z, color=color, shade=False, zorder=10)
 
-    plt.show()
+    if showplot == True:
+        plt.show()
 
 
 if "__main__" == __name__:

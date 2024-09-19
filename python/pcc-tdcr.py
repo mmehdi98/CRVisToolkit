@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from draw_tdcr import draw_tdcr
 import copy
+from utils import setupfigure
 
 
 class Section:
@@ -202,6 +203,18 @@ class TDCR_PCC:
         """
         return self.g[-1].reshape((4, 4), order="F")
 
+    @property
+    def section_ends(self):
+        """
+        Get the disks in which the sections end
+        """
+        i = self.sections[0].n
+        section_ends = [i]
+        for section in self.sections[1:]:
+            i += section.n - 1
+            section_ends.append(i)
+        return section_ends
+
     def add_section(self, n, l, kappa, phi=0):
         """
         Adds a section to the robot
@@ -273,12 +286,7 @@ class TDCR_PCC:
         """
         if len(self.sections) == 0:
             raise ValueError("The robot has no sections")
-        i = self.sections[0].n
-        section_ends = [i]
-        for section in self.sections[1:]:
-            i += section.n - 1
-            section_ends.append(i)
-        draw_tdcr(self.g, np.array(section_ends), **kwargs)
+        draw_tdcr(self.g, np.array(self.section_ends), **kwargs)
 
     def get_disk_tf(self, i):
         """
@@ -289,9 +297,10 @@ class TDCR_PCC:
         """
         return self.g[i].reshape((4, 4), order="F")
 
-    def workspace(self, ranges=None, kappa_step=0.5, phi_step=0.5):
+    def workspace(self, ranges=None, kappa_step=0.5, phi_step=0.5, ax=None):
         """
-        Visualizes the workspace of the robot
+        Visualizes the workspace of the robot.
+        Shows the plot only if the ax parameter is not provided.
 
         :param ranges: A list of dictionaries, each corresponding to a section having the keys of "kappa_range" and "phi_range".
                        The values are tuples of size 2 indicating the range of kappa and phi.
@@ -318,15 +327,19 @@ class TDCR_PCC:
         if len(ranges) != len(self.sections):
             raise ValueError("The number of ranges must match the number of sections")
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
+        showplot = False
+        if ax == None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            showplot = True           
         obj = copy.deepcopy(self)
         kappa_range = [rng["kappa_range"] for rng in ranges]
         phi_range = [rng["phi_range"] for rng in ranges]
 
         self._compute_workspace(obj, ax, kappa_range, phi_range, kappa_step, phi_step)
 
-        plt.show()
+        if showplot == True:
+            plt.show()
 
     @staticmethod
     def _compute_workspace(robot, ax, kappa_range, phi_range, kappa_step, phi_step):
@@ -350,7 +363,7 @@ class TDCR_PCC:
             i = len(robot.sections) - k - 1
             if k == 0:
                 x, y, z = robot.end_tf[:3, 3]
-                ax.scatter(x, y, z, color="b")
+                ax.scatter(x, y, z, color="k")
                 return
             for kp in np.arange(kappa_range[i][0], kappa_range[i][1], kappa_step):
                 if phi_range[i][0] == phi_range[i][1]:
@@ -393,15 +406,18 @@ def main():
     x = 5
     print(f"\nThe transfer function for the {x}th disk is: \n", robot.get_disk_tf(x))
 
-    robot.draw(r_disk=diameter / 2)
+    ax = setupfigure(robot.g, robot.section_ends, tipframe=True, segframe=False, baseframe=False, projections=False, baseplate=True)
+    robot.draw(r_disk=diameter / 2, ax=ax)
 
     ranges = [
-        {"kappa_range": (0, 5), "phi_range": (0, np.pi * 2)},
+        {"kappa_range": (0, 10), "phi_range": (0, np.pi * 2)},
         {"kappa_range": (0, 2), "phi_range": (0, 0)},
         {"kappa_range": (0, 2), "phi_range": (0, 0)},
     ]
 
-    robot.workspace(ranges=ranges, kappa_step=0.5, phi_step=0.8)
+    robot.workspace(ranges=ranges, kappa_step=0.5, phi_step=0.8, ax=ax)
+
+    plt.show()
 
 
 if __name__ == "__main__":
