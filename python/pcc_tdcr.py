@@ -297,7 +297,7 @@ class TDCR_PCC:
         """
         return self.g[i].reshape((4, 4), order="F")
 
-    def workspace(self, ranges=None, kappa_step=0.5, phi_step=0.5, ax=None):
+    def workspace(self, ranges=None, kappa_step=0.5, phi_step=0.5, ax=None, plot_midpoints=False):
         """
         Visualizes the workspace of the robot.
         Shows the plot only if the ax parameter is not provided.
@@ -309,6 +309,8 @@ class TDCR_PCC:
         :type kappa_step: float, optional
         :param phi_step: Increment of phi for workspace calculation
         :type phi_step: float, optional
+        :param plot_midpoints: If True, plots all of the disks rather than the end effector
+        :type plot_midpoints: boolean, optional
         """
         if ranges == None:
             ranges = []
@@ -336,13 +338,13 @@ class TDCR_PCC:
         kappa_range = [rng["kappa_range"] for rng in ranges]
         phi_range = [rng["phi_range"] for rng in ranges]
 
-        self._compute_workspace(obj, ax, kappa_range, phi_range, kappa_step, phi_step)
+        self._compute_workspace(obj, ax, kappa_range, phi_range, kappa_step, phi_step, plot_midpoints)
 
         if showplot == True:
             plt.show()
 
     @staticmethod
-    def _compute_workspace(robot, ax, kappa_range, phi_range, kappa_step, phi_step):
+    def _compute_workspace(robot, ax, kappa_range, phi_range, kappa_step, phi_step, plot_midpoints):
         """
         Generates dynamic nested for loops to populate the plot with the workspace points
 
@@ -357,22 +359,39 @@ class TDCR_PCC:
         :type kappa_step: float, optional
         :param phi_step: Increment of phi for workspace calculation
         :type phi_step: float, optional
+        :param plot_midpoints: If True, plots all of the disks rather than the end effector
+        :type plot_midpoints: boolean, optional
         """
-
+        
         def recursive(k, kappa, phi):
             i = len(robot.sections) - k - 1
+
+            #Plot scattering at the end of the recursion
             if k == 0:
-                x, y, z = robot.end_tf[:3, 3]
-                ax.scatter(x, y, z, color="k")
-                return
-            for kp in np.arange(kappa_range[i][0], kappa_range[i][1], kappa_step):
-                if phi_range[i][0] == phi_range[i][1]:
-                    robot.modify_section(i, kappa=kp)
-                    recursive(k - 1, kp, 0)
+                if plot_midpoints == True:
+                    cmap = plt.get_cmap('twilight')
+                    for z, section in enumerate(robot.sections):
+                        color = cmap(z/len(robot.sections))
+                        for g in section.g:
+                            x, y, z = g[12:15]
+                            ax.scatter(x, y, z, color = color)
                 else:
-                    for ph in np.arange(phi_range[i][0], phi_range[i][1], phi_step):
-                        robot.modify_section(i, kappa=kp, phi=ph)
-                        recursive(k - 1, kp, ph)
+                    x, y, z = robot.end_tf[:3, 3]
+                    ax.scatter(x, y, z, color="k")
+                return
+
+            #Recursion
+            if kappa_range[i][0] == kappa_range[i][1]:
+                recursive(k-1, kappa_range[i][0], phi_range[i][0])
+            else:
+                for kp in np.arange(kappa_range[i][0], kappa_range[i][1] + kappa_step/10, kappa_step):
+                    if phi_range[i][0] == phi_range[i][1]:
+                        robot.modify_section(i, kappa=kp)
+                        recursive(k - 1, kp, phi_range[i][0])
+                    else:
+                        for ph in np.arange(phi_range[i][0], phi_range[i][1] + phi_step/10, phi_step):
+                            robot.modify_section(i, kappa=kp, phi=ph)
+                            recursive(k - 1, kp, ph)
 
         recursive(len(robot.sections) - 1, 0, 0)
 
@@ -397,7 +416,7 @@ def main():
     robot.add_section(5, l3, kappa3)
 
     # Section modifiction
-    robot.modify_section(0, l=50e-3, kappa=0)
+    # robot.modify_section(0, l=50e-3, kappa=0)
 
     # Results
     print("Robot specifications: \n", robot, sep="")
@@ -415,15 +434,16 @@ def main():
         projections=False,
         baseplate=True,
     )
-    robot.draw(r_disk=diameter / 2, ax=ax)
+    ax.view_init(elev=0, azim=90)
 
     ranges = [
-        {"kappa_range": (0, 10), "phi_range": (0, np.pi * 2)},
-        {"kappa_range": (0, 2), "phi_range": (0, 0)},
-        {"kappa_range": (0, 2), "phi_range": (0, 0)},
+        {"kappa_range": (-20, 20), "phi_range": (0, 0)},
+        {"kappa_range": (-10, 10), "phi_range": (0, 0)},
+        {"kappa_range": (-10, 10), "phi_range": (0, 0)},
     ]
 
-    robot.workspace(ranges=ranges, kappa_step=0.5, phi_step=0.8, ax=ax)
+    robot.workspace(ranges=ranges, kappa_step=4, phi_step=0.2, ax=ax, plot_midpoints=True)
+    robot.draw(r_disk=diameter / 2, ax=ax)
 
     plt.show()
 

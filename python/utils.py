@@ -40,10 +40,15 @@ def setupfigure(g: np.ndarray[float], seg_end: np.ndarray[int], tipframe: bool, 
     curvelength = np.sum(np.linalg.norm(g[1:, 12:15] - g[:-1, 12:15], axis=1))
     max_val_x = np.max(np.abs(g[:, 12])) + clearance
     max_val_y = np.max(np.abs(g[:, 13])) + clearance
+
+    max_val = max(max_val_x, max_val_y, curvelength + clearance)
+    ax.set_xlim(-max_val, max_val)
+    ax.set_ylim(-max_val, max_val)
+    ax.set_zlim(0, max_val)
     ax.set_box_aspect([1, 1, 1]) # set aspect ratio of the plot
-    ax.set_xlim(-max_val_x, max_val_x)
-    ax.set_ylim(-max_val_y, max_val_y)
-    ax.set_zlim(0, curvelength + clearance)
+    # ax.set_xlim(-max_val_x, max_val_x)
+    # ax.set_ylim(-max_val_y, max_val_y)
+    # ax.set_zlim(0, curvelength + clearance)
     ax.set_xlabel('x (m)')
     ax.set_ylabel('y (m)')
     ax.set_zlabel('z (m)')
